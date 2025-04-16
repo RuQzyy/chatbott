@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>RuQzyy ChatBot</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="mode-toggle">
+      <label class="switch">
+        <input type="checkbox" id="modeSwitch" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    
+    <div class="robot-animation">
+      <lottie-player
+        src="animation/animation.json"
+        background="transparent"
+        speed="1"
+        style="width: 150px; height: 150px;"
+        loop
+        autoplay>
+      </lottie-player>
+    </div>
+    <h1>RuQzyy ChatBot</h1>
+    <div id="status" class="bot-status">🟢 Bot Online</div>
+    <div class="chat-box" id="chat-box"></div>
+    <div id="loading" class="bubble bot loading" style="display: none;">Mengetik<span id="dots">.</span></div>
+    <div class="input-area">
+      <input type="text" id="userInput" placeholder="Tulis pesan..." />
+      <button onclick="sendMessage()">Kirim</button>
+    </div>
+  </div>
+
+  <script>
+    let dotsInterval;
+
+    function typeText(element, text, speed = 5) {
+      let index = 0;
+      const interval = setInterval(() => {
+        element.textContent += text.charAt(index);
+        index++;
+        if (index >= text.length) clearInterval(interval);
+      }, speed);
+    }
+
+    function animateDots() {
+      const dots = document.getElementById("dots");
+      let count = 0;
+      dotsInterval = setInterval(() => {
+        count = (count + 1) % 4;
+        dots.textContent = ".".repeat(count);
+      }, 500);
+    }
+
+    function stopDots() {
+      clearInterval(dotsInterval);
+      document.getElementById("dots").textContent = ".";
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById("userInput");
+      const chatBox = document.getElementById("chat-box");
+      const loading = document.getElementById("loading");
+      const status = document.getElementById("status");
+
+      const userText = input.value.trim();
+      if (!userText) return;
+
+      chatBox.innerHTML += `<div class="bubble user">${userText}</div>`;
+      input.value = "";
+
+      loading.style.display = "block";
+      animateDots();
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: userText })
+        });
+
+        const data = await res.json();
+
+        loading.style.display = "none";
+        stopDots();
+        status.innerHTML = "🟢 Bot Online";
+
+        const botBubble = document.createElement("div");
+        botBubble.className = "bubble bot";
+        chatBox.appendChild(botBubble);
+        typeText(botBubble, data.reply);
+
+      } catch (error) {
+        loading.style.display = "none";
+        stopDots();
+        status.innerHTML = "🔴 Bot Offline";
+        chatBox.innerHTML += `<div class="bubble bot">Ups! Terjadi kesalahan 😢</div>`;
+      }
+
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Toggle Light/Dark Mode
+    const modeSwitch = document.getElementById('modeSwitch');
+    modeSwitch.addEventListener('change', () => {
+      document.body.classList.toggle('light-mode', modeSwitch.checked === false);
+    });
+
+  </script>
+</body>
+</html>
