@@ -18,7 +18,7 @@ public class ChatbotController {
         String message = payload.get("message").toLowerCase();
         Map<String, String> response = new HashMap<>();
 
-        if (message.contains("siapa pencipta") || message.contains("siapa yang buat")) {
+        if (message.contains("siapa pencipta chatbot") || message.contains("siapa yang buat chat bot")) {
             response.put("reply", "Project RuQzyy Chatbot ini dibuat oleh Muhammad Al-Faruq 🚀");
         } else {
             String aiReply = geminiService.generateResponse(message);

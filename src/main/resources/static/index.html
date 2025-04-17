@@ -6,15 +6,8 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 </head>
-<body>
+<body class="dark-mode">
   <div class="chat-container">
-    <div class="mode-toggle">
-      <label class="switch">
-        <input type="checkbox" id="modeSwitch" checked>
-        <span class="slider"></span>
-      </label>
-    </div>
-    
     <div class="robot-animation">
       <lottie-player
         src="animation/animation.json"
@@ -25,19 +18,27 @@
         autoplay>
       </lottie-player>
     </div>
-    <h1>RuQzyy ChatBot</h1>
+
+    <h1>RuQzyy ChatBot 
+      <button onclick="toggleTheme()" style="float:right; font-size: 18px;">🌙</button>
+    </h1>
+
     <div id="status" class="bot-status">🟢 Bot Online</div>
     <div class="chat-box" id="chat-box"></div>
     <div id="loading" class="bubble bot loading" style="display: none;">Mengetik<span id="dots">.</span></div>
+
     <div class="input-area">
       <input type="text" id="userInput" placeholder="Tulis pesan..." />
       <button onclick="sendMessage()">Kirim</button>
+      <button onclick="startListening()">🎤</button>
+      <button onclick="stopSpeech()">🔇</button>
     </div>
   </div>
 
   <script>
     let dotsInterval;
-
+    let currentUtterance = null; // ← Untuk kontrol text-to-speech
+  
     function typeText(element, text, speed = 5) {
       let index = 0;
       const interval = setInterval(() => {
@@ -46,7 +47,7 @@
         if (index >= text.length) clearInterval(interval);
       }, speed);
     }
-
+  
     function animateDots() {
       const dots = document.getElementById("dots");
       let count = 0;
@@ -55,62 +56,96 @@
         dots.textContent = ".".repeat(count);
       }, 500);
     }
-
+  
     function stopDots() {
       clearInterval(dotsInterval);
       document.getElementById("dots").textContent = ".";
     }
-
+  
     async function sendMessage() {
       const input = document.getElementById("userInput");
       const chatBox = document.getElementById("chat-box");
       const loading = document.getElementById("loading");
       const status = document.getElementById("status");
-
+  
       const userText = input.value.trim();
       if (!userText) return;
-
+  
       chatBox.innerHTML += `<div class="bubble user">${userText}</div>`;
       input.value = "";
-
+  
       loading.style.display = "block";
       animateDots();
       chatBox.scrollTop = chatBox.scrollHeight;
-
+  
       try {
         const res = await fetch("/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: userText })
         });
-
+  
         const data = await res.json();
-
+  
         loading.style.display = "none";
         stopDots();
         status.innerHTML = "🟢 Bot Online";
-
+  
         const botBubble = document.createElement("div");
         botBubble.className = "bubble bot";
         chatBox.appendChild(botBubble);
         typeText(botBubble, data.reply);
-
+        speak(data.reply); // 🔊
+  
       } catch (error) {
         loading.style.display = "none";
         stopDots();
         status.innerHTML = "🔴 Bot Offline";
         chatBox.innerHTML += `<div class="bubble bot">Ups! Terjadi kesalahan 😢</div>`;
       }
-
+  
       chatBox.scrollTop = chatBox.scrollHeight;
     }
-
-    // Toggle Light/Dark Mode
-    const modeSwitch = document.getElementById('modeSwitch');
-    modeSwitch.addEventListener('change', () => {
-      document.body.classList.toggle('light-mode', modeSwitch.checked === false);
-    });
-
+  
+    // 🎤 Voice input
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'id-ID';
+  
+    function startListening() {
+      recognition.start();
+      recognition.onresult = function(event) {
+        const spokenText = event.results[0][0].transcript;
+        document.getElementById("userInput").value = spokenText;
+        sendMessage();
+      };
+      recognition.onerror = function(event) {
+        alert("Gagal mengenali suara: " + event.error);
+      };
+    }
+  
+    // 🔊 Text-to-speech
+    function speak(text) {
+      stopSpeech(); // ← stop dulu biar tidak tumpang tindih
+      currentUtterance = new SpeechSynthesisUtterance(text);
+      currentUtterance.lang = 'id-ID';
+      speechSynthesis.speak(currentUtterance);
+    }
+  
+    function stopSpeech() {
+      if (speechSynthesis.speaking || speechSynthesis.pending) {
+        speechSynthesis.cancel();
+      }
+    }
+  
+    // 🌙 Light/Dark Mode Toggle
+    function toggleTheme() {
+      document.body.classList.toggle("dark-mode");
+      document.body.classList.toggle("light-mode");
+  
+      const btn = document.querySelector("h1 button");
+      btn.textContent = document.body.classList.contains("dark-mode") ? "🌙" : "☀️";
+    }
   </script>
+  
 </body>
 </html>
