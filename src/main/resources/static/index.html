@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>RuQzyy ChatBot</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
   <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 </head>
 <body class="dark-mode">
@@ -24,6 +26,13 @@
     </h1>
 
     <div id="status" class="bot-status">🟢 Bot Online</div>
+      <!-- Kamera di atas -->
+      <div id="webcam-container" style="text-align:center; margin-bottom: 10px;"></div>
+    <div id="camera-controls" style="margin: 10px 0;">
+      <button onclick="initCamera()">🎥 Analisa Benda</button>
+      <button onclick="stopCamera()">❌ Tutup Kamera</button>
+    </div>
+
     <div class="chat-box" id="chat-box"></div>
     <div id="loading" class="bubble bot loading" style="display: none;">Mengetik<span id="dots">.</span></div>
 
@@ -37,8 +46,8 @@
 
   <script>
     let dotsInterval;
-    let currentUtterance = null; // ← Untuk kontrol text-to-speech
-  
+    let currentUtterance = null;
+
     function typeText(element, text, speed = 5) {
       let index = 0;
       const interval = setInterval(() => {
@@ -47,7 +56,7 @@
         if (index >= text.length) clearInterval(interval);
       }, speed);
     }
-  
+
     function animateDots() {
       const dots = document.getElementById("dots");
       let count = 0;
@@ -56,61 +65,60 @@
         dots.textContent = ".".repeat(count);
       }, 500);
     }
-  
+
     function stopDots() {
       clearInterval(dotsInterval);
       document.getElementById("dots").textContent = ".";
     }
-  
+
     async function sendMessage() {
       const input = document.getElementById("userInput");
       const chatBox = document.getElementById("chat-box");
       const loading = document.getElementById("loading");
       const status = document.getElementById("status");
-  
+
       const userText = input.value.trim();
       if (!userText) return;
-  
+
       chatBox.innerHTML += `<div class="bubble user">${userText}</div>`;
       input.value = "";
-  
+
       loading.style.display = "block";
       animateDots();
       chatBox.scrollTop = chatBox.scrollHeight;
-  
+
       try {
         const res = await fetch("/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: userText })
         });
-  
+
         const data = await res.json();
-  
+
         loading.style.display = "none";
         stopDots();
         status.innerHTML = "🟢 Bot Online";
-  
+
         const botBubble = document.createElement("div");
         botBubble.className = "bubble bot";
         chatBox.appendChild(botBubble);
         typeText(botBubble, data.reply);
-        speak(data.reply); // 🔊
-  
+        speak(data.reply);
+
       } catch (error) {
         loading.style.display = "none";
         stopDots();
         status.innerHTML = "🔴 Bot Offline";
         chatBox.innerHTML += `<div class="bubble bot">Ups! Terjadi kesalahan 😢</div>`;
       }
-  
+
       chatBox.scrollTop = chatBox.scrollHeight;
     }
-  
-    // 🎤 Voice input
+
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'id-ID';
-  
+
     function startListening() {
       recognition.start();
       recognition.onresult = function(event) {
@@ -122,30 +130,111 @@
         alert("Gagal mengenali suara: " + event.error);
       };
     }
-  
-    // 🔊 Text-to-speech
+
     function speak(text) {
-      stopSpeech(); // ← stop dulu biar tidak tumpang tindih
+      stopSpeech();
       currentUtterance = new SpeechSynthesisUtterance(text);
       currentUtterance.lang = 'id-ID';
       speechSynthesis.speak(currentUtterance);
     }
-  
+
     function stopSpeech() {
       if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
       }
     }
-  
-    // 🌙 Light/Dark Mode Toggle
+
     function toggleTheme() {
       document.body.classList.toggle("dark-mode");
       document.body.classList.toggle("light-mode");
-  
+
       const btn = document.querySelector("h1 button");
       btn.textContent = document.body.classList.contains("dark-mode") ? "🌙" : "☀️";
     }
-  </script>
-  
+
+    <!-- 📸 Teachable Machine -->
+  const URL = "https://teachablemachine.withgoogle.com/models/EblJN3J4P/";
+  let model, webcam, maxPredictions;
+  let analyzingInterval = null;
+
+  async function initCamera() {
+    const modelURL = URL + "model.json";
+    const metadataURL = URL + "metadata.json";
+
+    try {
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+
+      webcam = new tmImage.Webcam(200, 150, true);
+      await webcam.setup();
+      await webcam.play();
+
+      const container = document.getElementById("webcam-container");
+      container.innerHTML = "";
+      container.appendChild(webcam.canvas);
+
+      webcam.canvas.id = "webcam";
+      webcam.canvas.style.display = "block";
+
+      // Jalankan kamera real-time update
+      requestAnimationFrame(updateCamera);
+
+      // Mulai analisa tiap 3 detik
+      startPredictionInterval();
+
+    } catch (err) {
+      console.error("Gagal membuka kamera:", err);
+      alert("Gagal membuka kamera. Cek izin dan pastikan kamera tidak sedang dipakai aplikasi lain.");
+    }
+  }
+
+  function updateCamera() {
+    if (webcam) {
+      webcam.update(); // keep video updating
+      requestAnimationFrame(updateCamera); // continue looping
+    }
+  }
+
+  function startPredictionInterval() {
+    if (analyzingInterval) clearInterval(analyzingInterval);
+
+    analyzingInterval = setInterval(() => {
+      predict(); // hanya prediksi yang delay, webcam tetap real-time
+    }, 4000); // setiap 3 detik
+  }
+
+  async function predict() {
+    const prediction = await model.predict(webcam.canvas);
+    prediction.sort((a, b) => b.probability - a.probability);
+
+    const top = prediction[0];
+    const label = top.className;
+    const confidence = (top.probability * 100).toFixed(2);
+    const message = `Saya mendeteksi: <b>${label}</b> dengan keyakinan ${confidence}%`;
+    const chatBox = document.getElementById("chat-box");
+    chatBox.innerHTML += `<div class="bubble bot">${message}</div>`;
+    speak(message);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function stopCamera() {
+    if (webcam) {
+      webcam.stop();
+      webcam = null;
+    }
+
+    if (analyzingInterval) {
+      clearInterval(analyzingInterval);
+      analyzingInterval = null;
+    }
+
+    const container = document.getElementById("webcam-container");
+    container.innerHTML = "";
+
+    const chatBox = document.getElementById("chat-box");
+    chatBox.innerHTML += `<div class="bubble bot">✅ Analisa dihentikan. Tekan "Analisa Benda" untuk memulai lagi.</div>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+</script>
 </body>
 </html>

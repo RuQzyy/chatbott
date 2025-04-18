@@ -10,6 +10,26 @@ body {
     padding: 0;
   }
 
+  #camera-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  #camera-controls button {
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: none;
+    background-color: #00bcd4;
+    color: white;
+    cursor: pointer;
+  }
+
+  #camera-controls button:hover {
+    background-color: #0097a7;
+  }
+
   .bubble.loading {
     font-style: italic;
     color: #aaa;
