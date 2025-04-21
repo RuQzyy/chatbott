@@ -41,6 +41,7 @@
       <button onclick="sendMessage()">Kirim</button>
       <button onclick="startListening()">🎤</button>
       <button onclick="stopSpeech()">🔇</button>
+      <button onclick="clearChat()">🗑️ Hapus Chat</button>
     </div>
   </div>
 
@@ -115,6 +116,12 @@
 
       chatBox.scrollTop = chatBox.scrollHeight;
     }
+    
+    function clearChat() {
+  const chatBox = document.getElementById("chat-box");
+  chatBox.innerHTML = "";
+  chatBox.innerHTML += `<div class="bubble bot">🧹 Obrolan telah dibersihkan.</div>`;
+}
 
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'id-ID';
@@ -153,7 +160,7 @@
     }
 
     <!-- 📸 Teachable Machine -->
-  const URL = "https://teachablemachine.withgoogle.com/models/EblJN3J4P/";
+  const URL = "https://teachablemachine.withgoogle.com/models/n-PFjMCxz/";
   let model, webcam, maxPredictions;
   let analyzingInterval = null;
 
